@@ -21,6 +21,7 @@
 /build
 
 # misc
+.firecrawl/
 .DS_Store
 *.pem
 
