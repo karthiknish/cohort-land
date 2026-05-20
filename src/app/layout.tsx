@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { Inter, Red_Hat_Display } from "next/font/google";
 
+import { AgentationProvider } from "@/components/agentation-provider";
+
 import "./globals.css";
+
+const isDevelopment = process.env.NODE_ENV === "development";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -32,7 +36,10 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${redHatDisplay.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans">{children}</body>
+      <body className="min-h-full font-sans">
+        {children}
+        {isDevelopment ? <AgentationProvider /> : null}
+      </body>
     </html>
   );
 }

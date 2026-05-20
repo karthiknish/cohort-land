@@ -1,11 +1,8 @@
 "use client";
 
-import { Minus, Plus, User } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
 
 import { AreaPill } from "./area-pill";
 import {
@@ -24,36 +21,63 @@ import {
 } from "./constants";
 import { Hero } from "./hero";
 import { SiteFooter } from "./site-footer";
+import { Step2TeamProfile } from "./step-2-team-profile";
+import { Step3Resources } from "./step-3-resources";
+import { Step4Specialists } from "./step-4-specialists";
+import { SPECIALISTS } from "./specialists";
 import { StepCard } from "./step-card";
-
-const RESOURCE_OPTIONS = [3, 4, 5, 6, 7, 8, 9, 10];
 
 export function CohortCalculator() {
   const [selectedAreas, setSelectedAreas] = useState<HelpAreaId[]>([]);
   const [team, setTeam] = useState<TeamProfile>({
     currentStaff: UK_2026_AVERAGES.currentStaff,
-    overheadPercent: UK_2026_AVERAGES.overheadPercent,
+    overheadsAnnual: UK_2026_AVERAGES.overheadsAnnual,
+    useUkAverage: UK_2026_AVERAGES.useUkAverage,
   });
   const [resourceCount, setResourceCount] = useState(DEFAULT_RESOURCES);
+  const [selectedSpecialistIds, setSelectedSpecialistIds] = useState<string[]>(
+    [],
+  );
 
   const step1Complete = selectedAreas.length > 0;
   const step2Complete = step1Complete;
   const step3Complete = step2Complete;
 
-  const costs = useMemo(
-    () =>
-      calculateCosts({
-        areas: selectedAreas,
-        team,
-        resourceCount,
-      }),
-    [selectedAreas, team, resourceCount],
-  );
+  const costs = useMemo(() => {
+    const effectiveTeam = step1Complete
+      ? team
+      : {
+          currentStaff: UK_2026_AVERAGES.currentStaff,
+          overheadsAnnual: UK_2026_AVERAGES.overheadsAnnual,
+          useUkAverage: true,
+        };
+    return calculateCosts({
+      areas: selectedAreas,
+      team: effectiveTeam,
+      resourceCount,
+      selectedSpecialistIds,
+    });
+  }, [selectedAreas, team, resourceCount, step1Complete, selectedSpecialistIds]);
+
+  function toggleSpecialist(id: string) {
+    setSelectedSpecialistIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
+  }
 
   function toggleArea(id: HelpAreaId) {
-    setSelectedAreas((prev) =>
-      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id],
-    );
+    setSelectedAreas((prev) => {
+      const next = prev.includes(id)
+        ? prev.filter((a) => a !== id)
+        : [...prev, id];
+      setSelectedSpecialistIds((ids) =>
+        ids.filter((sid) => {
+          const specialist = SPECIALISTS.find((s) => s.id === sid);
+          return specialist && next.includes(specialist.areaId);
+        }),
+      );
+      return next;
+    });
   }
 
   function adjustResources(delta: number) {
@@ -80,12 +104,14 @@ export function CohortCalculator() {
             step1Complete={step1Complete}
             step2Complete={step2Complete}
             step3Complete={step3Complete}
+            selectedSpecialistIds={selectedSpecialistIds}
+            onToggleSpecialist={toggleSpecialist}
           />
 
           <CohortSidebar
             resourceCount={resourceCount}
             costs={costs}
-            step1Complete={step1Complete}
+            selectedSpecialistIds={selectedSpecialistIds}
           />
         </div>
       </div>
@@ -107,6 +133,8 @@ function FormColumn({
   step1Complete,
   step2Complete,
   step3Complete,
+  selectedSpecialistIds,
+  onToggleSpecialist,
 }: {
   selectedAreas: HelpAreaId[];
   toggleArea: (id: HelpAreaId) => void;
@@ -119,6 +147,8 @@ function FormColumn({
   step1Complete: boolean;
   step2Complete: boolean;
   step3Complete: boolean;
+  selectedSpecialistIds: string[];
+  onToggleSpecialist: (id: string) => void;
 }) {
   return (
     <div className="flex flex-col gap-5">
@@ -145,238 +175,61 @@ function FormColumn({
         description="Tell us your real numbers, or skip to use the UK 2026 average."
         locked={!step1Complete}
         lockedLabel="STEP 2 LOCKED"
+        headerAction={
+          step1Complete ? (
+            <button
+              type="button"
+              onClick={() =>
+                setTeam({
+                  currentStaff: UK_2026_AVERAGES.currentStaff,
+                  overheadsAnnual: UK_2026_AVERAGES.overheadsAnnual,
+                  useUkAverage: true,
+                })
+              }
+              className="text-sm font-semibold text-[#2563eb] underline-offset-2 hover:underline"
+            >
+              Skip — use UK avg
+              <ArrowRight className="ml-0.5 inline size-3.5" />
+            </button>
+          ) : undefined
+        }
       >
-        <div className="grid gap-6 sm:grid-cols-[1fr_auto]">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label
-                htmlFor="current-staff"
-                className="text-[0.65rem] font-semibold tracking-wide text-gray-500"
-              >
-                CURRENT STAFF
-              </Label>
-              <Input
-                id="current-staff"
-                type="number"
-                min={0}
-                placeholder="e.g. 3"
-                value={team.currentStaff || ""}
-                onChange={(e) =>
-                  setTeam((t) => ({
-                    ...t,
-                    currentStaff: Number(e.target.value) || 0,
-                  }))
-                }
-                className="h-11 bg-gray-50/80"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label
-                htmlFor="overhead"
-                className="text-[0.65rem] font-semibold tracking-wide text-gray-500"
-              >
-                OVERHEAD (%)
-              </Label>
-              <Input
-                id="overhead"
-                type="number"
-                min={0}
-                placeholder="e.g. 30"
-                value={team.overheadPercent || ""}
-                onChange={(e) =>
-                  setTeam((t) => ({
-                    ...t,
-                    overheadPercent: Number(e.target.value) || 0,
-                  }))
-                }
-                className="h-11 bg-gray-50/80"
-              />
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:min-w-[180px]">
-            <p className="text-[0.6rem] font-semibold leading-snug tracking-wide text-gray-400">
-              EST. SALARY — MID-LEVEL — PER
-            </p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">
-              {formatGbp(step1Complete ? costs.estSalaryMonthly : 0)}
-              <span className="text-base font-semibold text-gray-500">
-                {" "}
-                /mo
-              </span>
-            </p>
-          </div>
-        </div>
+        <Step2TeamProfile
+          selectedAreas={selectedAreas}
+          team={team}
+          setTeam={setTeam}
+        />
       </StepCard>
 
       <StepCard
         step={3}
         title="How many resources?"
-        description="Select the number of embedded specialists for your cohort."
-        locked={!step2Complete}
-        lockedLabel="STEP 3 LOCKED"
+        description={`Starts at ${RESOURCE_MIN}. Add more — each extra is just £1,000/mo with Cohorts.`}
       >
-        <ResourceSelector
+        <Step3Resources
           resourceCount={resourceCount}
           setResourceCount={setResourceCount}
           adjustResources={adjustResources}
-          costs={costs}
-          active={step2Complete}
+          selectedAreas={selectedAreas}
+          team={team}
+          step1Complete={step1Complete}
+          selectedSpecialistIds={selectedSpecialistIds}
         />
       </StepCard>
 
       <StepCard
         step={4}
         title="Choose your specialists"
-        description="Pick a category to see experts."
+        description="Optional — pick real specialists and the cost adjusts to their precise UK salary."
         locked={!step3Complete}
         lockedLabel="STEP 4 LOCKED"
       >
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-6 py-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-gray-200/80 text-gray-400">
-            <User className="size-6" />
-          </div>
-          <p className="mt-4 text-sm font-medium text-gray-600">
-            Pick a category to see experts.
-          </p>
-          <p className="mt-1 text-xs text-gray-400">
-            Choose one or more areas in Step 1.
-          </p>
-        </div>
+        <Step4Specialists
+          selectedAreas={selectedAreas}
+          selectedSpecialistIds={selectedSpecialistIds}
+          onToggleSpecialist={onToggleSpecialist}
+        />
       </StepCard>
-    </div>
-  );
-}
-
-function ResourceSelector({
-  resourceCount,
-  setResourceCount,
-  adjustResources,
-  costs,
-  active,
-}: {
-  resourceCount: number;
-  setResourceCount: (n: number) => void;
-  adjustResources: (delta: number) => void;
-  costs: ReturnType<typeof calculateCosts>;
-  active: boolean;
-}) {
-  const display = active ? costs : zeroCosts();
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={() => adjustResources(-1)}
-          disabled={resourceCount <= RESOURCE_MIN}
-          className="flex size-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
-          aria-label="Decrease resources"
-        >
-          <Minus className="size-4" />
-        </button>
-        <span className="min-w-[3rem] text-center text-5xl font-extrabold tracking-tight text-gray-900">
-          {resourceCount}
-        </span>
-        <button
-          type="button"
-          onClick={() => adjustResources(1)}
-          disabled={resourceCount >= RESOURCE_MAX}
-          className="flex size-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
-          aria-label="Increase resources"
-        >
-          <Plus className="size-4" />
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {RESOURCE_OPTIONS.map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => setResourceCount(n)}
-            className={cn(
-              "min-w-[2.25rem] rounded-md border px-2.5 py-1.5 text-sm font-semibold transition-colors",
-              resourceCount === n
-                ? "border-[#2563eb] bg-[#2563eb] text-white"
-                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300",
-            )}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-
-      <div className="rounded-lg bg-gray-100 px-5 py-4">
-        <p className="text-[0.65rem] font-semibold tracking-wide text-gray-500">
-          YOUR COHORTS PRICE
-        </p>
-        <p className="mt-1 text-3xl font-bold text-gray-400">
-          {formatGbp(display.cohortMonthly)}
-          <span className="text-lg font-semibold"> /mo</span>
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <CostBox
-          label="IN-HOUSE COST"
-          value={formatGbp(display.inHouseMonthly)}
-        />
-        <CostBox
-          label="YOU SAVE"
-          value={`${formatGbp(display.savingsMonthly)} /mo`}
-          sub={`${display.savingsPercent}%`}
-          highlight
-        />
-      </div>
-    </div>
-  );
-}
-
-function zeroCosts() {
-  return {
-    inHouseMonthly: 0,
-    cohortMonthly: 0,
-    savingsMonthly: 0,
-    savingsPercent: 0,
-    estSalaryMonthly: 0,
-  };
-}
-
-function CostBox({
-  label,
-  value,
-  sub,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border px-4 py-3",
-        highlight
-          ? "border-blue-200 bg-blue-50"
-          : "border-gray-200 bg-white",
-      )}
-    >
-      <p className="text-[0.62rem] font-semibold tracking-wide text-gray-500">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "mt-1 text-lg font-bold",
-          highlight ? "text-blue-900" : "text-gray-400",
-        )}
-      >
-        {value}
-        {sub ? (
-          <span className="ml-1 text-sm font-semibold text-blue-600">{sub}</span>
-        ) : null}
-      </p>
     </div>
   );
 }

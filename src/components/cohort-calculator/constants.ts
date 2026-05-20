@@ -43,13 +43,24 @@ export const HELP_AREAS = [
 
 export type HelpAreaId = (typeof HELP_AREAS)[number]["id"];
 
-export const UK_MID_LEVEL_MONTHLY = 2500;
+/** UK mid-level monthly salary used for in-house comparison */
+export const UK_MID_LEVEL_MONTHLY = 3500;
+
+/** Cohort flat base price for minimum team size */
+export const COHORT_BASE_PRICE = 3500;
+
+/** Price per resource above the base pack */
+export const COHORT_EXTRA_RESOURCE = 1000;
 
 export const RESOURCE_MIN = 3;
 export const RESOURCE_MAX = 10;
 export const DEFAULT_RESOURCES = 3;
 
+/** Quick-pick options shown in Step 3 */
+export const RESOURCE_QUICK_PICKS = [3, 4, 5, 6, 8, 10] as const;
+
 export const UK_2026_AVERAGES = {
-  currentStaff: 3,
-  overheadPercent: 30,
+  currentStaff: 8,
+  overheadsAnnual: null as number | null,
+  useUkAverage: true,
 } as const;
